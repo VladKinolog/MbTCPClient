@@ -1,0 +1,21 @@
+<component name="ArtifactManager">
+  <artifact type="javafx" name="MbTCPClient">
+    <output-path>$PROJECT_DIR$/out/artifacts/MbTCPClient</output-path>
+    <properties id="javafx-properties">
+      <options>
+        <option name="appClass" value="sample.Main" />
+        <option name="description" value="" />
+        <option name="htmlPlaceholderId" value="" />
+        <option name="title" value="" />
+        <option name="vendor" value="" />
+        <option name="version" value="" />
+      </options>
+    </properties>
+    <root id="root">
+      <element id="archive" name="MbTCPClient.jar">
+        <element id="module-output" name="MbTCPClient" />
+      </element>
+      <element id="library" level="project" name="org.apache.servicemix.bundles:org.apache.servicemix.bundles.jamod:1.2_1" />
+    </root>
+  </artifact>
+</component>

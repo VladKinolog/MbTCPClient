@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="org.apache.servicemix.bundles:org.apache.servicemix.bundles.jamod:1.2_1" type="repository">
+    <properties maven-id="org.apache.servicemix.bundles:org.apache.servicemix.bundles.jamod:1.2_1" />
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/org/apache/servicemix/bundles/org.apache.servicemix.bundles.jamod/1.2_1/org.apache.servicemix.bundles.jamod-1.2_1.jar!/" />
+      <root url="jar://$MAVEN_REPOSITORY$/org/rxtx/rxtx/2.1.7/rxtx-2.1.7.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
