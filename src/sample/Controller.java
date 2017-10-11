@@ -14,6 +14,7 @@ import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.*;
 
+import javafx.scene.shape.Polygon;
 import javafx.stage.Stage;
 import net.wimpi.modbus.ModbusCoupler;
 import net.wimpi.modbus.ModbusException;
@@ -45,6 +46,9 @@ public class Controller {
     private static final int LVL_ON_PUMP_REG = 4540;
     private static final int LVL_OFF_PUMP_REG = 4539;
     private static  final int LVL_DRY_MO_REG = 4514;
+
+    private final int MAX_Y_COORD_BAR = 565;
+    private final int MIN_Y_COORD_BAR = 350;
 
     @FXML
     private AnchorPane backgroundPane;
@@ -130,6 +134,20 @@ public class Controller {
     @FXML
     private ImageView rightTube;
 
+    @FXML
+    private Polygon maxLvlMarkPolyg;
+
+    @FXML
+    private Polygon minLvlMarkPolyg;
+
+    @FXML
+    private Polygon onPumpLvlMarkPolyg;
+
+    @FXML
+    private Polygon offPumpLvlMarkPolyg;
+
+
+
 
 
 
@@ -144,7 +162,8 @@ public class Controller {
     private Image pumpLeftAlarmImage;
     private Image pumpRightAlarmImage;
 
-    private float floatPoint = (float) 0.1;
+    private volatile float floatPoint = (float) 0.1;
+    private volatile int lvlSensorMaxLimit = 25;
 
     private ModbusTCPTransaction mbTransaction;
     volatile private TCPMasterConnection connection;
@@ -158,11 +177,21 @@ public class Controller {
     private int alarmWordPrevious = 0;
     private ArrayList<Integer> typeAlarmListPrevious = new ArrayList<Integer>();
 
+    private LvlBarUtils maxLvlMark;
+    private LvlBarUtils minLvlMark;
+    private LvlBarUtils onPbmpLvlMark;
+    private LvlBarUtils offPumpLvlMark;
+
     private Path alarmListFile = Paths.get("src\\sample\\files\\worck\\observalarm.ser");
     private String alarmCSVFile = "src\\sample\\files\\csv\\";
 
     @FXML
     private void initialize(){
+
+        maxLvlMark = new LvlBarUtils(MIN_Y_COORD_BAR,MAX_Y_COORD_BAR);
+        minLvlMark = new LvlBarUtils(MIN_Y_COORD_BAR,MAX_Y_COORD_BAR);
+        onPbmpLvlMark = new LvlBarUtils(MIN_Y_COORD_BAR,MAX_Y_COORD_BAR);
+        offPumpLvlMark = new LvlBarUtils(MIN_Y_COORD_BAR,MAX_Y_COORD_BAR);
 
         pumpLeftOffImage = new Image(String.valueOf(getClass().getResource(IMAGE_ADDR + "pumpLeftOff.png")));
         pumpRightOffImage = new Image(String.valueOf(getClass().getResource(IMAGE_ADDR + "pumpRightOff.png")));
@@ -278,50 +307,6 @@ public class Controller {
         }
     }
 
-    @FXML
-    private void sendValueToPLC(Button but) {
-        //ModbusRequest req;
-        Node focusNode = stage.getScene().getFocusOwner();
-        String nodeName = focusNode.getId();
-        println("фокус находится на - " + nodeName);
-        Register r = ModbusCoupler.getReference().getProcessImageFactory().createRegister();
-        ModbusRequest req;
-
-        switch (but.getId()) {
-            case "overflwLvlTF":
-                r.setValue(getTextFieldValue((TextField) focusNode, (float) 0.1));
-                req = new WriteSingleRegisterRequest(4539, r);
-                req.setUnitID(netSetup.getUnitId());
-                mbTransaction.setRequest(req);
-                break;
-
-            case "onPumpLvlTF":
-                req = new WriteSingleRegisterRequest(4539, r);
-                req.setUnitID(netSetup.getUnitId());
-                mbTransaction.setRequest(req);
-                break;
-
-            case "offPumpLvlTF":
-                req = new WriteSingleRegisterRequest(4539, r);
-                req.setUnitID(netSetup.getUnitId());
-                mbTransaction.setRequest(req);
-                break;
-
-            case "dryMoLvlTF":
-                req = new WriteSingleRegisterRequest(4539, r);
-                req.setUnitID(netSetup.getUnitId());
-                mbTransaction.setRequest(req);
-                break;
-
-            default:
-                break;
-        }
-        try {
-            mbTransaction.execute();
-        } catch (ModbusException e) {
-            e.printStackTrace();
-        }
-    }
 
     private int getTextFieldValue(TextField textField, float floatPoint){
             String tfValue = textField.getText().trim().replace(",",".");
@@ -332,7 +317,8 @@ public class Controller {
     private int getTextFieldValue(String value, float  floatPoint){
             value = value.replace(",",".").trim();
             float fl = Float.parseFloat(value)/floatPoint;
-            return (int) fl;
+            return Math.round(fl);
+
         }
 
 
@@ -415,37 +401,51 @@ public class Controller {
          }
     }
 
-    private void printValueInTextField(TextField targetField,Button button, int value, float floatPoint){
+    private void printValueInTextField(TextField targetField, Button button, int value, float floatPoint){
         float resultValue = value * floatPoint;
         // Форматирование вывода
-        String decimFormat = "#" + (new StringBuilder (Float.toString(floatPoint)).reverse()).toString().replace("1","0");
+        String decimFormat =  "#" + (new StringBuilder (Float.toString(floatPoint))).toString().replace("1","0");
 
 
         if (!button.isVisible()) {
-            Platform.runLater(new Runnable() {
-                @Override
-                public void run() {
-                    targetField.setText(new DecimalFormat(decimFormat).format(resultValue));
-                }
-            });
-        } else {
-
+            Platform.runLater(() -> targetField.setText(new DecimalFormat(decimFormat).format(resultValue)));
         }
     }
 
     private void printLevel(int level,float floatPoint){
         float resultLevel = level * floatPoint;
-        String decimFormat = "#" + (new StringBuilder (Float.toString(floatPoint)).reverse()).toString().replace("1","0");
+        String decimFormat = "#" + (new StringBuilder (Float.toString(floatPoint))).toString().replace("1","0");
 
-        Platform.runLater(new Runnable() {
-            @Override
-            public void run() {
-                levelLabel.setText(new DecimalFormat(decimFormat).format(resultLevel));
-                levelProgressBar.setProgress((double) level/25);
-            }
+        Platform.runLater(() -> {
+            levelLabel.setText(new DecimalFormat(decimFormat).format(resultLevel));
+            levelProgressBar.setProgress((double) level/lvlSensorMaxLimit);
         });
+    }
 
+    /**
+     * Задание предела для датчика уровня
+     * @param typeSensor выбор типа датчика
+     * @param customtypeSensor Пользовательское значение предела датчика уровня
+     * @return предел датчика уровня
+     */
+    private int setLvlSensorLimit (int typeSensor, int customtypeSensor){
+        int maxLvl = 25;
+        if (typeSensor == 3){
+            maxLvl = customtypeSensor;
+        } else {
+            switch (typeSensor) {
+                case 0: maxLvl = 100;break;
+                case 1: maxLvl = 25; break;
+                case 2: maxLvl = 60; break;
+            }
+        }
+        floatPoint = setFloatPoint(typeSensor);
 
+        return maxLvl;
+    }
+
+    private float setFloatPoint (int typeSensor){
+        return (typeSensor == 0)? (float) 0.01: (float) 0.1;
     }
 
 
@@ -492,7 +492,9 @@ public class Controller {
 
             try {
                 r.setValue(getTextFieldValue(value,floatPoint));
+
                 println(Integer.toString(getTextFieldValue(value,floatPoint)));
+
                 req = new WriteSingleRegisterRequest(numRegistr, r);
                 req.setUnitID(netSetup.getUnitId());
                 mbTransaction.setRequest(req);
@@ -510,8 +512,7 @@ public class Controller {
             }
         }
 
-
-        Platform.runLater(()-> leftAnchorPane.requestFocus()); //Сброс фокуса
+        leftAnchorPane.requestFocus(); //Сброс фокуса
     }
 
     /**
@@ -597,7 +598,7 @@ public class Controller {
         alarmWordPrevious = alarmWordCurrent;
     }
 
-    private void writeCSV(String file,AlarmType alarmType){
+    private void writeCSV(String file,AlarmType alarmType) {
         String nameCSVFile;
         String separat  = ";";
         nameCSVFile = new SimpleDateFormat("MM_yyyy").format(new Date())+"_Alam.csv";
@@ -661,13 +662,6 @@ public class Controller {
         return FXCollections.observableArrayList();
     }
 
-//    private void writeObject(ObjectOutputStream s) throws IOException {
-//        s.defaultWriteObject();
-//        s.writeUTF(.getValueSafe()); // can't be null so use getValueSafe that returns empty string if it's null
-//        s.writeUTF();
-//    }
-
-
     public void curentAlarmLabelMousClick(MouseEvent mouseEvent) {
         try {
             main.startAlarmStage();
@@ -683,6 +677,12 @@ public class Controller {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+    /*
+        получение координаты для метки уровня
+    */
+    public void gangeMarkYCoord (LvlBarUtils lvlMark,Polygon mark,int curentLvl, int typeSensor, int customLvlSensor){
+       Platform.runLater(() -> mark.setLayoutY(lvlMark.getResultYCoord(curentLvl,typeSensor,customLvlSensor)));
     }
 
     public class RequestTimerTask extends TimerTask{
@@ -704,6 +704,8 @@ public class Controller {
         int setDrymoLvl;
         int firstAlarmWord;
         int secondAlarmWord;
+        int typeLvlSens;
+        int customLvlSens;
 
         @Override
         public void run() {
@@ -743,7 +745,7 @@ public class Controller {
             registersResponse = (ReadMultipleRegistersResponse)  mbTransaction.getResponse();
 
             level = registersResponse.getRegister(3).getValue();
-            printLevel(level, (float) 0.1);
+            printLevel(level, floatPoint);
 
             //Настройки
             sendRequest(4504, 52);
@@ -755,11 +757,22 @@ public class Controller {
             setOffPumpLvl = registersResponse.getRegisterValue(35);
             setDrymoLvl = registersResponse.getRegisterValue(10);
 
+            typeLvlSens = registersResponse.getRegisterValue(2);
+            customLvlSens = registersResponse.getRegisterValue(3);
+
+            //Тип датчика уровня
+            lvlSensorMaxLimit = setLvlSensorLimit(typeLvlSens,customLvlSens);
+            //Отрисовка меток заданых уровней
+            gangeMarkYCoord(maxLvlMark,maxLvlMarkPolyg,setOwerflLvl,typeLvlSens,customLvlSens);
+            gangeMarkYCoord(minLvlMark,minLvlMarkPolyg,setDrymoLvl,typeLvlSens,customLvlSens);
+            gangeMarkYCoord(onPbmpLvlMark,onPumpLvlMarkPolyg,setOnPumpLvl,typeLvlSens,customLvlSens);
+            gangeMarkYCoord(offPumpLvlMark,offPumpLvlMarkPolyg,setOffPumpLvl,typeLvlSens,customLvlSens);
+
             //Вывод в поля значений
-            printValueInTextField(overflwLvlTF,overflwLvlButton, setOwerflLvl,(float) 0.1);
-            printValueInTextField(onPumpLvlTF,onPumpLvlTFButton ,setOnPumpLvl,(float) 0.1);
-            printValueInTextField(offPumpLvlTF,offPumpLvlTFButton, setOffPumpLvl,(float) 0.1);
-            printValueInTextField(dryMoLvlTF,dryMoLvlTFButton, setDrymoLvl,(float) 0.1);
+            printValueInTextField(overflwLvlTF,overflwLvlButton, setOwerflLvl,floatPoint);
+            printValueInTextField(onPumpLvlTF,onPumpLvlTFButton ,setOnPumpLvl,floatPoint);
+            printValueInTextField(offPumpLvlTF,offPumpLvlTFButton, setOffPumpLvl,floatPoint);
+            printValueInTextField(dryMoLvlTF,dryMoLvlTFButton, setDrymoLvl,floatPoint);
 
             //Параметры частотника\плавного пуска
             sendRequest(4726, 17);

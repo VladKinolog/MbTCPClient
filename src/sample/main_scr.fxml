@@ -86,8 +86,8 @@
                               </VBox>
                            </children>
                         </HBox>
-                        <ProgressBar fx:id="levelProgressBar" layoutX="219.0" layoutY="427.0" prefHeight="46.0" prefWidth="220.0" progress="0.0" rotate="-90.0" />
-                        <Label fx:id="levelLabel" alignment="CENTER" contentDisplay="CENTER" layoutX="308.0" layoutY="340.0" prefHeight="34.0" prefWidth="46.0" textAlignment="CENTER">
+                        <ProgressBar fx:id="levelProgressBar" layoutX="220.0" layoutY="425.0" prefHeight="46.0" prefWidth="220.0" progress="0.0" rotate="-90.0" />
+                        <Label fx:id="levelLabel" alignment="CENTER" contentDisplay="CENTER" layoutX="306.0" layoutY="340.0" prefHeight="34.0" prefWidth="46.0" textAlignment="CENTER">
                            <font>
                               <Font size="24.0" />
                            </font>
@@ -102,6 +102,51 @@
                               <Image url="@image/RightTube.png" />
                            </image>
                         </ImageView>
+                        <ImageView fitHeight="218.0" fitWidth="15.0" layoutX="295.0" layoutY="339.0" pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@image/scale.png" />
+                           </image>
+                        </ImageView>
+                        <Polygon fx:id="maxLvlMarkPolyg" fill="RED" layoutX="294.0" layoutY="565.0" rotate="90.0" scaleX="0.15" scaleY="0.15" stroke="BLACK" strokeType="INSIDE">
+                          <points>
+                            <Double fx:value="-50.0" />
+                            <Double fx:value="40.0" />
+                            <Double fx:value="50.0" />
+                            <Double fx:value="40.0" />
+                            <Double fx:value="0.0" />
+                            <Double fx:value="-60.0" />
+                          </points>
+                        </Polygon>
+                        <Polygon fx:id="minLvlMarkPolyg" fill="YELLOW" layoutX="294.0" layoutY="350.0" rotate="90.0" scaleX="0.15" scaleY="0.15" stroke="BLACK" strokeType="INSIDE">
+                           <points>
+                              <Double fx:value="-50.0" />
+                              <Double fx:value="40.0" />
+                              <Double fx:value="50.0" />
+                              <Double fx:value="40.0" />
+                              <Double fx:value="0.0" />
+                              <Double fx:value="-60.0" />
+                           </points>
+                        </Polygon>
+                        <Polygon fx:id="onPumpLvlMarkPolyg" fill="#6f6fff" layoutX="294.0" layoutY="380.0" rotate="90.0" scaleX="0.15" scaleY="0.15" stroke="BLACK" strokeType="INSIDE">
+                           <points>
+                              <Double fx:value="-50.0" />
+                              <Double fx:value="40.0" />
+                              <Double fx:value="50.0" />
+                              <Double fx:value="40.0" />
+                              <Double fx:value="0.0" />
+                              <Double fx:value="-60.0" />
+                           </points>
+                        </Polygon>
+                        <Polygon fx:id="offPumpLvlMarkPolyg" fill="#00dd00" layoutX="294.0" layoutY="420.0" rotate="90.0" scaleX="0.15" scaleY="0.15" stroke="BLACK" strokeType="INSIDE">
+                           <points>
+                              <Double fx:value="-50.0" />
+                              <Double fx:value="40.0" />
+                              <Double fx:value="50.0" />
+                              <Double fx:value="40.0" />
+                              <Double fx:value="0.0" />
+                              <Double fx:value="-60.0" />
+                           </points>
+                        </Polygon>
                      </children>
                   </AnchorPane>
                 <AnchorPane fx:id="rightAnchorPane" minHeight="0.0" minWidth="0.0" onMouseClicked="#rightAnchorPaneClick" prefHeight="598.0" prefWidth="243.0">
@@ -198,9 +243,10 @@
          </children>
       </VBox>
       <ProgressIndicator layoutX="260.0" layoutY="298.0" prefHeight="76.0" prefWidth="79.0" visible="false" />
-      <Button fx:id="connectOkButton" layoutX="250.0" layoutY="310.0" maxHeight="80.0" maxWidth="180.0" mnemonicParsing="false" onAction="#connectOkClicked" prefHeight="58.0" prefWidth="103.0" text="Связь">
+      <Button fx:id="connectOkButton" layoutX="246.0" layoutY="260.0" maxHeight="80.0" maxWidth="180.0" mnemonicParsing="false" onAction="#connectOkClicked" prefHeight="58.0" prefWidth="103.0" text="Связь">
          <font>
             <Font name="System Bold" size="24.0" />
-         </font></Button>
+         </font>
+      </Button>
    </children>
 </AnchorPane>
