@@ -27,6 +27,9 @@ public class Main extends Application {
 
         primaryStage.setTitle("");
         primaryStage.setScene(scene);
+        primaryStage.setMaxHeight(650);
+        primaryStage.setMaxWidth(670);
+        primaryStage.getIcons().add(new Image(this.getClass().getResourceAsStream("/sample/image/pumpLeftOn.png")));
         primaryStage.setResizable(false);
 
 

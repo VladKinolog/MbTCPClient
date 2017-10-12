@@ -1,13 +1,11 @@
 package sample;
 
 import javafx.application.Platform;
-import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -32,7 +30,6 @@ import java.nio.file.*;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.function.Function;
 
 
 public class Controller {
@@ -46,6 +43,9 @@ public class Controller {
     private static final int LVL_ON_PUMP_REG = 4540;
     private static final int LVL_OFF_PUMP_REG = 4539;
     private static  final int LVL_DRY_MO_REG = 4514;
+
+    private final int DU_COIL_MONITOR = 2048;
+    private final int DU_COIL = 2587;
 
     private final int MAX_Y_COORD_BAR = 565;
     private final int MIN_Y_COORD_BAR = 350;
@@ -70,6 +70,9 @@ public class Controller {
 
     @FXML
     private Button connectOkButton;
+
+    @FXML
+    private ToggleButton duButton;
 
     @FXML
     private Button overflwLvlButton;
@@ -185,6 +188,8 @@ public class Controller {
     private Path alarmListFile = Paths.get("src\\sample\\files\\worck\\observalarm.ser");
     private String alarmCSVFile = "src\\sample\\files\\csv\\";
 
+    private boolean isSplitPaneChange = false;
+
     @FXML
     private void initialize(){
 
@@ -259,13 +264,20 @@ public class Controller {
 
     @FXML
     private void leftAnchorPaneClick(){
-        splitPane.setDividerPosition(0,0.9);
+
+        //splitPane.setDividerPosition(0,0.9);
+
+        startMoutionPanel(splitPane, splitPane.getDividerPositions()[0], 0.9, 1);
+
         Platform.runLater(()-> leftAnchorPane.requestFocus());
     }
 
     @FXML
     private void rightAnchorPaneClick(){
-        splitPane.setDividerPosition(0,0.7);
+        //splitPane.setDividerPosition(0,0.7);
+
+        startMoutionPanel(splitPane,  splitPane.getDividerPositions()[0], 0.7, 1);
+
         Platform.runLater(()-> rightAnchorPane.requestFocus());
 
     }
@@ -294,6 +306,8 @@ public class Controller {
         TimerTask taskTimer = new RequestTimerTask();
 
         timer.schedule(taskTimer, netSetup.getTimeCycle(), netSetup.getTimeCycle());
+
+        leftAnchorPane.requestFocus(); //Сброс фокуса
     }
 
 
@@ -516,6 +530,52 @@ public class Controller {
     }
 
     /**
+     * Обработчик нажатия кнопки дистанционной блокировки
+     * @param actionEvent
+     */
+
+    public void duButtonOnAction(ActionEvent actionEvent) {
+
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Удаленная блокировка станции");
+        alert.setHeaderText("Заблокировать работу насосов?");
+
+        ButtonType blockButton = new ButtonType("Блок");
+        ButtonType unBlockButton = new ButtonType("Работа");
+        ButtonType cancelButton = new ButtonType("Отмена", ButtonBar.ButtonData.CANCEL_CLOSE);
+
+        alert.getButtonTypes().setAll(blockButton,unBlockButton,cancelButton);
+
+        alert.showAndWait().ifPresent(response -> {
+            ModbusRequest req;
+            try {
+                if (response == blockButton) {
+                    // println(Integer.toString(getTextFieldValue(value,floatPoint)));
+                    req = new WriteCoilRequest(DU_COIL, true);
+                    req.setUnitID(netSetup.getUnitId());
+                    mbTransaction.setRequest(req);
+                    mbTransaction.execute();
+                    duButton.setSelected(true);
+
+                } else if (response == unBlockButton) {
+                    req = new WriteCoilRequest(DU_COIL, false);
+                    req.setUnitID(netSetup.getUnitId());
+                    mbTransaction.setRequest(req);
+                    mbTransaction.execute();
+                    duButton.setSelected(false);
+
+                } else {
+                    alert.close();
+
+                }
+            } catch (ModbusException e){
+                e.printStackTrace();
+            }
+        });
+
+    }
+
+    /**
      * Обработчик клика мышки по SplitPane (сбрасывает видимость всех кнопок)
      * @param mouseEvent событие
      */
@@ -678,17 +738,29 @@ public class Controller {
             e.printStackTrace();
         }
     }
-    /*
-        получение координаты для метки уровня
+
+
+    private void duStatusHendler(Boolean statusDu){
+        if (statusDu){
+            Platform.runLater(()-> duButton.setSelected(true));
+        } else {
+            Platform.runLater(()-> duButton.setSelected(false));
+        }
+    }
+    /**
+     *получение координаты для метки уровня
     */
     public void gangeMarkYCoord (LvlBarUtils lvlMark,Polygon mark,int curentLvl, int typeSensor, int customLvlSensor){
        Platform.runLater(() -> mark.setLayoutY(lvlMark.getResultYCoord(curentLvl,typeSensor,customLvlSensor)));
     }
 
+
+
     public class RequestTimerTask extends TimerTask{
 
         ModbusRequest request;
         ReadMultipleRegistersResponse registersResponse;
+
         int level;
         int statusSwitchPump1;
         int statusSwitchPump2;
@@ -787,6 +859,8 @@ public class Controller {
 
             alarmHending(firstAlarmWord, secondAlarmWord);
 
+            //Обработчик ДУ
+            duStatusHendler(readSingleCoilRequest(DU_COIL_MONITOR));
 
             System.out.println("Время опроса = " + (System.currentTimeMillis() - time));
 
@@ -803,6 +877,23 @@ public class Controller {
                 connection.close();
             }
         }
+
+        private boolean readSingleCoilRequest (int ref){
+            ReadCoilsResponse coilsResponse;
+            ModbusRequest coilRequest = new ReadCoilsRequest(ref,1);
+            coilRequest.setUnitID(unitID);
+            mbTransaction.setRequest(coilRequest);
+            try {
+                mbTransaction.execute();
+                //coilRequest = (ReadCoilsResponse) coilsResponse.getCoilStatus(1);
+            } catch (ModbusException e) {
+                e.printStackTrace();
+                connection.close();
+            }
+            coilsResponse = (ReadCoilsResponse) mbTransaction.getResponse();
+            println("coilsResponse.getCoilStatus(0) = " + coilsResponse.getCoilStatus(0));
+            return coilsResponse.getCoilStatus(0);
+        }
     }
 
 
@@ -818,6 +909,40 @@ public class Controller {
 
             }
         }
+    }
+
+    private void startMoutionPanel (SplitPane pane,double starPos, double endPos, int sleep){
+        final double[] currentPos = {starPos};
+        final boolean[] result = {false};
+        Thread thread = new Thread(()-> {
+
+            if (starPos > endPos) {
+                while (currentPos[0] > endPos) {
+                    currentPos[0] = currentPos[0] - 0.001;
+                    Platform.runLater(() -> pane.setDividerPosition(0, currentPos[0]));
+                    try {
+                        Thread.sleep(sleep);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+
+                }
+            } else if (starPos < endPos){
+                while (currentPos[0] < endPos) {
+                    currentPos[0] = currentPos[0] + 0.001;
+                    Platform.runLater(() -> pane.setDividerPosition(0, currentPos[0]));
+                    try {
+                        Thread.sleep(sleep);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+
+                }
+            }
+
+        });
+        thread.setDaemon(true);
+        thread.start();
     }
 
 
