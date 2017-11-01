@@ -26,6 +26,7 @@ import net.wimpi.modbus.procimg.Register;
 
 import java.io.*;
 import java.net.InetAddress;
+import java.net.URISyntaxException;
 import java.nio.file.*;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
@@ -37,7 +38,7 @@ public class Controller {
     private static final String AUTO = "АВТОМАТ";
     private static final String OFF = "ВЫКЛЮЧЕН";
     private static final String MANUAL = "РУЧНОЙ";
-    private final String IMAGE_ADDR = "/sample/image/";
+    private static final String IMAGE_ADDR = "/sample/image/";
 
     private static final int LVL_OVF_REG = 4513;
     private static final int LVL_ON_PUMP_REG = 4540;
@@ -185,13 +186,22 @@ public class Controller {
     private LvlBarUtils onPbmpLvlMark;
     private LvlBarUtils offPumpLvlMark;
 
-    private Path alarmListFile = Paths.get("src\\sample\\files\\worck\\observalarm.ser");
-    private String alarmCSVFile = "src\\sample\\files\\csv\\";
+    private String alarmCSVFile = "files\\csv\\";
+    private String alarmListFile = "files\\worck\\";
+    private Path alarmListPath = Paths.get(alarmListFile,"observalarm.ser");
+
+    //private String alarmCSVFile = Main.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+
 
     private boolean isSplitPaneChange = false;
 
+    public Controller() throws URISyntaxException {
+    }
+
+
     @FXML
-    private void initialize(){
+    private void initialize()  {
+
 
         maxLvlMark = new LvlBarUtils(MIN_Y_COORD_BAR,MAX_Y_COORD_BAR);
         minLvlMark = new LvlBarUtils(MIN_Y_COORD_BAR,MAX_Y_COORD_BAR);
@@ -215,16 +225,26 @@ public class Controller {
 
         timer.schedule(checkConnectTimer,500,500);
 
-        alarmList = read(alarmListFile);
+        //Проверка наличия файла журнала авариии Создание каталога если его нет.
+        checkCatalogExist(new File(alarmCSVFile));
+        checkCatalogExist(new File(alarmListFile));
+
+        alarmList = read(alarmListPath);
 
         alarmList.addListener((ListChangeListener<AlarmType>)(c ->
         {
             print("Событие по изменению списка, рамер составляет " + alarmList.size());
-            write(alarmList, alarmListFile);
+            write(alarmList, alarmListPath);
         } ));
 
 
 
+    }
+
+    private void checkCatalogExist(File file){
+        if (!file.exists()){
+            file.mkdirs();
+        }
     }
 
     public void setMain (Main main){

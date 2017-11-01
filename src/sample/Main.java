@@ -49,7 +49,7 @@ public class Main extends Application {
     public void startSetupStage() throws Exception{
 
         FXMLLoader loader = new FXMLLoader();
-        loader.setLocation(Main.class.getResource("setup.fxml"));
+        loader.setLocation(Main.class.getResource("recourse\\setup.fxml"));
         AnchorPane setupLayout = loader.load();
 
         Stage dialogStage = new Stage();
@@ -71,7 +71,7 @@ public class Main extends Application {
 
     public void startAlarmStage() throws Exception{
         FXMLLoader loader = new FXMLLoader();
-        loader.setLocation(Main.class.getResource("alarm_scr.fxml"));
+        loader.setLocation(Main.class.getResource("recourse\\alarm_scr.fxml"));
         AnchorPane alarmLayout = loader.load();
 
         Stage dialogStage = new Stage();
