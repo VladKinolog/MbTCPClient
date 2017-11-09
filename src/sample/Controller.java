@@ -48,6 +48,9 @@ public class Controller {
     private final int DU_COIL_MONITOR = 2048;
     private final int DU_COIL = 2587;
 
+    private final int OF_PUMP_ON = 1054;
+
+
     private final int MAX_Y_COORD_BAR = 565;
     private final int MIN_Y_COORD_BAR = 350;
 
@@ -115,6 +118,9 @@ public class Controller {
     private ImageView pump2OnShape;
 
     @FXML
+    private ImageView pumpOFOnShape;
+
+    @FXML
     private ProgressBar levelProgressBar;
 
     @FXML
@@ -151,10 +157,6 @@ public class Controller {
     private Polygon offPumpLvlMarkPolyg;
 
 
-
-
-
-
     private InetAddress ipAddress;
     private int port = 502;
     private int unitID = 1;
@@ -168,6 +170,10 @@ public class Controller {
 
     private volatile float floatPoint = (float) 0.1;
     private volatile int lvlSensorMaxLimit = 25;
+
+    private volatile int setNumRetryConnect = 4;
+    private volatile int numRetryConnect = 0;
+    private volatile boolean connectOkClickedFirst = false;
 
     private ModbusTCPTransaction mbTransaction;
     volatile private TCPMasterConnection connection;
@@ -190,10 +196,14 @@ public class Controller {
     private String alarmListFile = "files\\worck\\";
     private Path alarmListPath = Paths.get(alarmListFile,"observalarm.ser");
 
+
     //private String alarmCSVFile = Main.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
 
 
     private boolean isSplitPaneChange = false;
+
+    private TimerTask taskTimer;
+    private Timer requestTimer;
 
     public Controller() throws URISyntaxException {
     }
@@ -220,10 +230,11 @@ public class Controller {
         focusList(offPumpLvlTF,offPumpLvlTFLable,offPumpLvlTFButton);
         focusList(dryMoLvlTF,dryMoLvlTFLable,dryMoLvlTFButton);
 
+
+        // проверка наличия связи
         Timer timer = new Timer(true);
         TimerTask checkConnectTimer = new CheckConnectTimer();
-
-        timer.schedule(checkConnectTimer,500,500);
+        timer.schedule(checkConnectTimer,3000,3000);
 
         //Проверка наличия файла журнала авариии Создание каталога если его нет.
         checkCatalogExist(new File(alarmCSVFile));
@@ -231,13 +242,14 @@ public class Controller {
 
         alarmList = read(alarmListPath);
 
-        alarmList.addListener((ListChangeListener<AlarmType>)(c ->
-        {
+        alarmList.addListener((ListChangeListener<AlarmType>)(c -> {
             print("Событие по изменению списка, рамер составляет " + alarmList.size());
             write(alarmList, alarmListPath);
         } ));
 
+        duButton.setTooltip(new Tooltip("Дистанционная блокировка станции"));
 
+        Platform.runLater(() -> leftAnchorPane.requestFocus()); //Сброс фокуса //TODO Попробовать реализовать при загрузке экрана
 
     }
 
@@ -319,15 +331,19 @@ public class Controller {
                 mbTransaction = new ModbusTCPTransaction(connection);
 
             } catch (Exception e) {
+                System.out.println("Ошибка соединения");
                 e.printStackTrace();
+
             }
         // запуск таймера с переодичностью опросов
-        Timer timer = new Timer(true);
-        TimerTask taskTimer = new RequestTimerTask();
+        requestTimer = new Timer(true);
+        taskTimer = new RequestTimerTask();
 
-        timer.schedule(taskTimer, netSetup.getTimeCycle(), netSetup.getTimeCycle());
+        requestTimer.schedule(taskTimer, netSetup.getTimeCycle(), netSetup.getTimeCycle());
 
-        leftAnchorPane.requestFocus(); //Сброс фокуса
+        Platform.runLater(() -> leftAnchorPane.requestFocus()); //Сброс фокуса
+
+        connectOkClickedFirst = true; // Флаг по нажатию кнопки "Соединения" первый раз
     }
 
 
@@ -422,8 +438,16 @@ public class Controller {
                  break;
         }
         Platform.runLater(() -> pumpShape.setImage(pumpColor));
+    }
 
-
+    private void changeColorPump(ImageView pumpShape, boolean pumpStatus){
+        Image pumpColor;
+        if(pumpStatus){
+            pumpColor = pumpRightOnImage;
+        }else {
+            pumpColor = pumpRightOffImage;
+        }
+        Platform.runLater(() -> pumpShape.setImage(pumpColor));
     }
 
     private void visibleTube(ImageView tube, int statusP){
@@ -612,11 +636,8 @@ public class Controller {
         dryMoLvlTFLable.setLayoutX(65);
     }
 
-    /**
-     * Обработка аварий станции
-     * @param alarmW1 первое аварийное слово
-     * @param alarmW2 второе аварийное слово
-     */
+
+
     private synchronized void alarmHending(int alarmW1,int alarmW2) {
 
         int alarmWordCurrent = AlarmParsing.getAlarmWord(alarmW1,alarmW2);
@@ -801,90 +822,102 @@ public class Controller {
 
         @Override
         public void run() {
-            long time = System.currentTimeMillis();
-            //чтение состояния Насосов.
-            sendRequest(8096,8);
-            registersResponse = (ReadMultipleRegistersResponse)  mbTransaction.getResponse();
+            try {
+                long time = System.currentTimeMillis();
+                //чтение состояния Насосов.
+                sendRequest(8096, 8);
+                registersResponse = (ReadMultipleRegistersResponse) mbTransaction.getResponse();
 
-            // Опрос сотояния переключателя ручной - выкл - автомат
-            statusSwitchPump1 = registersResponse.getRegister(0).getValue();
-            statusSwitchPump2 = registersResponse.getRegister(1).getValue();
-            //statusSwitchPump3 = registersResponse.getRegister(2).getValue();
-            //statusSwitchPump4 = registersResponse.getRegister(3).getValue();
+                // Опрос сотояния переключателя ручной - выкл - автомат
+                statusSwitchPump1 = registersResponse.getRegister(0).getValue();
+                statusSwitchPump2 = registersResponse.getRegister(1).getValue();
+                //statusSwitchPump3 = registersResponse.getRegister(2).getValue();
+                //statusSwitchPump4 = registersResponse.getRegister(3).getValue();
 
-            // Опрос состояния насосов выкл - включ - авария
-            statusPump1 = registersResponse.getRegister(4).getValue();
-            statusPump2 = registersResponse.getRegister(5).getValue();
-            //statusPump3 = registersResponse.getRegister(6).getValue();
-            //statusPump4 = registersResponse.getRegister(7).getValue();
+                // Опрос состояния насосов выкл - включ - авария
+                statusPump1 = registersResponse.getRegister(4).getValue();
+                statusPump2 = registersResponse.getRegister(5).getValue();
+                //statusPump3 = registersResponse.getRegister(6).getValue();
+                //statusPump4 = registersResponse.getRegister(7).getValue();
 
-            // Вывод на экрана сотояния переключателя ручн-выкл-автомат в завис от состояния
-            printStatusSwitchPump(statusPump1Label,statusSwitchPump1);
-            printStatusSwitchPump(statusPump2Label,statusSwitchPump2);
-            //printStatusSwitchPump(statusPump3Label,statusSwitchPump1);
-            //printStatusSwitchPump(statusPump4Label,statusSwitchPump2);
+                // Вывод на экрана сотояния переключателя ручн-выкл-автомат в завис от состояния
+                printStatusSwitchPump(statusPump1Label, statusSwitchPump1);
+                printStatusSwitchPump(statusPump2Label, statusSwitchPump2);
+                //printStatusSwitchPump(statusPump3Label,statusSwitchPump1);
+                //printStatusSwitchPump(statusPump4Label,statusSwitchPump2);
 
-            //Вывод на экран изменения сотояния насоса
-            changeColorPump(pump1OnShape,statusPump1,1);
-            changeColorPump(pump2OnShape,statusPump2,2);
-            visibleTube(leftTube,statusPump1);
-            visibleTube(rightTube,statusPump2);
-            //changeColorPump(pump3OnShape,statusPump3);
-            //changeColorPump(pump4OnShape,statusPump4);
+                //Вывод на экран изменения сотояния насоса
+                changeColorPump(pump1OnShape, statusPump1, 1);
+                changeColorPump(pump2OnShape, statusPump2, 2);
+                visibleTube(leftTube, statusPump1);
+                visibleTube(rightTube, statusPump2);
+                //changeColorPump(pump3OnShape,statusPump3);
+                //changeColorPump(pump4OnShape,statusPump4);
 
-            //Опрос датчиков
-            sendRequest(4098, 7);
-            registersResponse = (ReadMultipleRegistersResponse)  mbTransaction.getResponse();
+                //Опрос датчиков
+                sendRequest(4098, 7);
+                registersResponse = (ReadMultipleRegistersResponse) mbTransaction.getResponse();
 
-            level = registersResponse.getRegister(3).getValue();
-            printLevel(level, floatPoint);
+                level = registersResponse.getRegister(3).getValue();
+                printLevel(level, floatPoint);
 
-            //Настройки
-            sendRequest(4504, 52);
-            registersResponse = (ReadMultipleRegistersResponse)  mbTransaction.getResponse();
+                //Настройки
+                sendRequest(4504, 52);
+                registersResponse = (ReadMultipleRegistersResponse) mbTransaction.getResponse();
 
-            //считывание значений уровня
-            setOwerflLvl = registersResponse.getRegisterValue(9);
-            setOnPumpLvl = registersResponse.getRegisterValue(36);
-            setOffPumpLvl = registersResponse.getRegisterValue(35);
-            setDrymoLvl = registersResponse.getRegisterValue(10);
+                //считывание значений уровня
+                setOwerflLvl = registersResponse.getRegisterValue(9);
+                setOnPumpLvl = registersResponse.getRegisterValue(36);
+                setOffPumpLvl = registersResponse.getRegisterValue(35);
+                setDrymoLvl = registersResponse.getRegisterValue(10);
 
-            typeLvlSens = registersResponse.getRegisterValue(2);
-            customLvlSens = registersResponse.getRegisterValue(3);
+                typeLvlSens = registersResponse.getRegisterValue(2);
+                customLvlSens = registersResponse.getRegisterValue(3);
 
-            //Тип датчика уровня
-            lvlSensorMaxLimit = setLvlSensorLimit(typeLvlSens,customLvlSens);
-            //Отрисовка меток заданых уровней
-            gangeMarkYCoord(maxLvlMark,maxLvlMarkPolyg,setOwerflLvl,typeLvlSens,customLvlSens);
-            gangeMarkYCoord(minLvlMark,minLvlMarkPolyg,setDrymoLvl,typeLvlSens,customLvlSens);
-            gangeMarkYCoord(onPbmpLvlMark,onPumpLvlMarkPolyg,setOnPumpLvl,typeLvlSens,customLvlSens);
-            gangeMarkYCoord(offPumpLvlMark,offPumpLvlMarkPolyg,setOffPumpLvl,typeLvlSens,customLvlSens);
+                //Тип датчика уровня
+                lvlSensorMaxLimit = setLvlSensorLimit(typeLvlSens, customLvlSens);
+                //Отрисовка меток заданых уровней
+                gangeMarkYCoord(maxLvlMark, maxLvlMarkPolyg, setOwerflLvl, typeLvlSens, customLvlSens);
+                gangeMarkYCoord(minLvlMark, minLvlMarkPolyg, setDrymoLvl, typeLvlSens, customLvlSens);
+                gangeMarkYCoord(onPbmpLvlMark, onPumpLvlMarkPolyg, setOnPumpLvl, typeLvlSens, customLvlSens);
+                gangeMarkYCoord(offPumpLvlMark, offPumpLvlMarkPolyg, setOffPumpLvl, typeLvlSens, customLvlSens);
 
-            //Вывод в поля значений
-            printValueInTextField(overflwLvlTF,overflwLvlButton, setOwerflLvl,floatPoint);
-            printValueInTextField(onPumpLvlTF,onPumpLvlTFButton ,setOnPumpLvl,floatPoint);
-            printValueInTextField(offPumpLvlTF,offPumpLvlTFButton, setOffPumpLvl,floatPoint);
-            printValueInTextField(dryMoLvlTF,dryMoLvlTFButton, setDrymoLvl,floatPoint);
 
-            //Параметры частотника\плавного пуска
-            sendRequest(4726, 17);
-            registersResponse = (ReadMultipleRegistersResponse)  mbTransaction.getResponse();
+                //Вывод в поля значений
+                printValueInTextField(overflwLvlTF, overflwLvlButton, setOwerflLvl, floatPoint);
+                printValueInTextField(onPumpLvlTF, onPumpLvlTFButton, setOnPumpLvl, floatPoint);
+                printValueInTextField(offPumpLvlTF, offPumpLvlTFButton, setOffPumpLvl, floatPoint);
+                printValueInTextField(dryMoLvlTF, dryMoLvlTFButton, setDrymoLvl, floatPoint);
 
-            //Аварийное слово
-            sendRequest(36868, 2);
-            registersResponse = (ReadMultipleRegistersResponse)  mbTransaction.getResponse();
+                //Параметры частотника\плавного пуска
+                sendRequest(4726, 17);
+                registersResponse = (ReadMultipleRegistersResponse) mbTransaction.getResponse();
 
-            firstAlarmWord = registersResponse.getRegisterValue(0);
-            secondAlarmWord = registersResponse.getRegisterValue(1);
+                //Аварийное слово
+                sendRequest(36868, 2);
+                registersResponse = (ReadMultipleRegistersResponse) mbTransaction.getResponse();
 
-            alarmHending(firstAlarmWord, secondAlarmWord);
+                firstAlarmWord = registersResponse.getRegisterValue(0);
+                secondAlarmWord = registersResponse.getRegisterValue(1);
 
-            //Обработчик ДУ
-            duStatusHendler(readSingleCoilRequest(DU_COIL_MONITOR));
+                alarmHending(firstAlarmWord, secondAlarmWord);
 
-            System.out.println("Время опроса = " + (System.currentTimeMillis() - time));
+                //Обработчик ДУ
+                duStatusHendler(readSingleCoilRequest(DU_COIL_MONITOR));
 
+                // Насос откачки жидкости с приямка
+                changeColorPump(pumpOFOnShape, readSingleInputRequest(OF_PUMP_ON));
+
+                System.out.println("Время опроса = " + (System.currentTimeMillis() - time));
+            }catch (Exception e){
+                println("Ошибка считывания данныйх");
+                requestTimer.cancel();
+
+                println(Integer.toString(requestTimer.purge()));
+                connection.close();
+            }
         }
+
 
         private void sendRequest (int ref,int count){
             request = new ReadMultipleRegistersRequest(ref,count);
@@ -898,6 +931,11 @@ public class Controller {
             }
         }
 
+        /**
+         *  Чтение одного битового Coil регистра
+         * @param ref адресс регистра в 10-тичн системе с 0.
+         * @return значение регисра (True or false)
+         */
         private boolean readSingleCoilRequest (int ref){
             ReadCoilsResponse coilsResponse;
             ModbusRequest coilRequest = new ReadCoilsRequest(ref,1);
@@ -911,9 +949,30 @@ public class Controller {
                 connection.close();
             }
             coilsResponse = (ReadCoilsResponse) mbTransaction.getResponse();
-            println("coilsResponse.getCoilStatus(0) = " + coilsResponse.getCoilStatus(0));
+            //println("coilsResponse.getCoilStatus(0) = " + coilsResponse.getCoilStatus(0));
             return coilsResponse.getCoilStatus(0);
         }
+
+        /**
+         * Чтение одного битового Input регистра
+         * @param ref адресс регистра в 10-тичн системе с 0.
+         * @return значение регисра (True or false)
+         */
+        private boolean readSingleInputRequest(int ref){
+            ReadInputDiscretesResponse inputResponse;
+            ModbusRequest inputRequest = new ReadInputDiscretesRequest(ref,1);
+            inputRequest.setUnitID(unitID);
+            mbTransaction.setRequest(inputRequest);
+            try {
+                mbTransaction.execute();
+            } catch (ModbusException e){
+                e.printStackTrace();
+                connection.close();
+            }
+            inputResponse = (ReadInputDiscretesResponse) mbTransaction.getResponse();
+            return inputResponse.getDiscreteStatus(0);
+        }
+
     }
 
 
@@ -926,7 +985,9 @@ public class Controller {
             }else {
                 Platform.runLater(() -> splitPane.setOpacity(0.2));
                 Platform.runLater(() -> connectOkButton.setVisible(true));
-
+                if (connectOkClickedFirst) {
+                    connectOkClicked();
+                }
             }
         }
     }

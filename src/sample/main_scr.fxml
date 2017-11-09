@@ -13,7 +13,7 @@
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
 
-<AnchorPane fx:id="backgroundPane" maxHeight="625.0" maxWidth="670.0" minHeight="625.0" minWidth="670.0" prefHeight="625.0" prefWidth="670.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sample.Controller">
+<AnchorPane fx:id="backgroundPane" maxHeight="625.0" maxWidth="670.0" minHeight="625.0" minWidth="670.0" prefHeight="625.0" prefWidth="670.0" stylesheets="@Style/myStyle.css" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sample.Controller">
    <children>
       <VBox AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
          <children>
@@ -158,6 +158,11 @@
                               <Double fx:value="-60.0" />
                            </points>
                         </Polygon>
+                        <ImageView fx:id="pumpOFOnShape" fitHeight="70.0" fitWidth="50.0" layoutX="525.0" layoutY="494.0" pickOnBounds="true" preserveRatio="true">
+                           <image>
+                              <Image url="@image/pumpRightOff.png" />
+                           </image>
+                        </ImageView>
                      </children>
                   </AnchorPane>
                 <AnchorPane fx:id="rightAnchorPane" minHeight="0.0" minWidth="0.0" onMouseClicked="#rightAnchorPaneClick" prefHeight="598.0" prefWidth="243.0">
